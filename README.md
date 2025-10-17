@@ -104,15 +104,15 @@ python view_reconstruction.py my_reconstruction.pth
 
 
 ```Bash
-python demo.py --imagedir=data/sfm_bench/rgb --calib=calib/eth.txt
+python demo.py --base_dir data/sfm_bench --rgb_dir rgb --calib calib/eth.txt --stride 3
 ```
 
 ```Bash
-python demo.py --imagedir=data/mav0/cam0/data --calib=calib/euroc.txt --t0=150
+python demo.py --base_dir data/mav0/cam0 --rgb_dir data --calib calib/euroc.txt --t0=150 --stride 3
 ```
 
 ```Bash
-python demo.py --imagedir=data/rgbd_dataset_freiburg3_cabinet/rgb --calib=calib/tum3.txt
+python demo.py --base_dir data/rgbd_dataset_freiburg3_cabinet --rgb_dir rgb --calib=calib/tum3.txt --stride 3
 ```
 
 

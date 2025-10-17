@@ -13,7 +13,7 @@ from lietorch import SE3
 
 from cuda_timer import CudaTimer
 
-def view_reconstruction(filename: str, filter_thresh = 0.005, filter_count=2):
+def view_reconstruction(filename: str, filter_thresh = 0.005, filter_count=2, save_point_cloud_path=None):
     reconstruction_blob = torch.load(filename)
     images = reconstruction_blob["images"].cuda()[...,::2,::2]
     disps = reconstruction_blob["disps"].cuda()[...,::2,::2]
@@ -40,6 +40,11 @@ def view_reconstruction(filename: str, filter_thresh = 0.005, filter_count=2):
     point_cloud.points = o3d.utility.Vector3dVector(points_np)
     point_cloud.colors = o3d.utility.Vector3dVector(colors_np)
 
+    # Save point cloud if path is provided
+    if save_point_cloud_path is not None:
+        o3d.io.write_point_cloud(save_point_cloud_path, point_cloud, write_ascii=True, compressed=False)
+        print(f"Point cloud saved to {save_point_cloud_path}")
+
     vis = o3d.visualization.Visualizer()
     vis.create_window(height=960, width=960)
     vis.get_render_option().load_from_json("misc/renderoption.json")
@@ -64,6 +69,7 @@ if __name__ == '__main__':
     parser.add_argument("filename", type=str, help="path to image directory")
     parser.add_argument("--filter_threshold", type=float, default=0.005)
     parser.add_argument("--filter_count", type=int, default=3)
+    parser.add_argument("--save_pc", type=str, default=None, help="path to save point cloud (PLY format)")
     args = parser.parse_args()
 
-    view_reconstruction(args.filename, args.filter_threshold, args.filter_count)
+    view_reconstruction(args.filename, args.filter_threshold, args.filter_count, args.save_pc)

@@ -94,7 +94,12 @@ class PoseTrajectoryFiller:
         images = []
         intrinsics = []
         
-        for (tstamp, image, intrinsic) in image_stream:
+        for item in image_stream:
+            # Support streams yielding 3- or 4-tuples; ignore depth if present
+            if len(item) == 4:
+                tstamp, image, _, intrinsic = item
+            else:
+                tstamp, image, intrinsic = item
             tstamps.append(tstamp)
             images.append(image)
             intrinsics.append(intrinsic)

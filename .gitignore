@@ -154,5 +154,6 @@ cache
 *.o
 data
 figures/*.pdf
-
+*.txt
+*.ply
 
