@@ -7,7 +7,6 @@ import torch
 import lietorch
 import cv2
 import os
-import glob 
 import time
 import argparse
 
@@ -16,6 +15,24 @@ from droid import Droid
 from droid_async import DroidAsync
 
 import torch.nn.functional as F
+
+IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff'}
+DEPTH_EXTENSIONS = IMAGE_EXTENSIONS | {'.npy'}
+
+def collect_files(base_dir, subdir, exts, stride):
+    dir_path = subdir if os.path.isabs(subdir) else os.path.join(base_dir, subdir)
+    try:
+        entries = sorted(os.listdir(dir_path))
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Directory not found: {dir_path}") from exc
+    files = [
+        os.path.join(dir_path, name)
+        for name in entries
+        if os.path.splitext(name)[1].lower() in exts
+    ]
+    if not files:
+        raise FileNotFoundError(f"No files with extensions {sorted(exts)} found in {dir_path}")
+    return files[::stride]
 
 
 def show_image(image):
@@ -35,8 +52,8 @@ def image_stream(datapath, rgb_path, depth_path, calib, stride):
     K[1,1] = fy
     K[1,2] = cy
 
-    image_list = sorted(glob.glob(os.path.join(datapath, rgb_path, '*.png')))[::stride]
-    depth_list = sorted(glob.glob(os.path.join(datapath, depth_path, '*.png')))[::stride] if depth_path is not None else None
+    image_list = collect_files(datapath, rgb_path, IMAGE_EXTENSIONS, stride)
+    depth_list = collect_files(datapath, depth_path, DEPTH_EXTENSIONS, stride) if depth_path is not None else None
 
     for t, imfile in enumerate(image_list):
         image = cv2.imread(imfile)
@@ -58,13 +75,24 @@ def image_stream(datapath, rgb_path, depth_path, calib, stride):
 
         if depth_path is not None:
             dfile = depth_list[t]
-            depth = cv2.imread(dfile, cv2.IMREAD_ANYDEPTH) / 1000.0
-            depth = torch.as_tensor(depth)
+            depth = load_depth_map(dfile)
             depth = F.interpolate(depth[None,None], (h1, w1)).squeeze()
             depth = depth[:h1-h1%8, :w1-w1%8]
             yield t, image[None], depth, intrinsics
         else:
             yield t, image[None], intrinsics
+
+
+def load_depth_map(dfile):
+    ext = os.path.splitext(dfile)[1].lower()
+    if ext in {'.png', '.jpg', '.jpeg'}:
+        depth = cv2.imread(dfile, cv2.IMREAD_ANYDEPTH)
+        depth = depth.astype(np.float32) / 1000.0
+    elif ext == '.npy':
+        depth = np.load(dfile).astype(np.float32)
+    else:
+        raise ValueError(f"Unsupported depth extension: {ext}")
+    return torch.as_tensor(depth)
 
 
 def save_reconstruction(droid, save_path):
@@ -154,6 +182,10 @@ if __name__ == '__main__':
             droid = DroidAsync(args) if args.asynchronous else Droid(args)
         
         droid.track(t, image, depth, intrinsics=intrinsics)
+
+    if droid is None:
+        print("No frames were processed; check input paths and calib.")
+        sys.exit(1)
 
     # Fill poses for every frame (dense trajectory) - always use RGB stream
     traj_est = droid.terminate(image_stream(args.base_dir, args.rgb_dir, None, args.calib, 1))
